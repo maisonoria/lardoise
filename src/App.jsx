@@ -545,8 +545,7 @@ export default function App() {
           onBack={() => setView("documents")}
           onSave={async data => {
             const { data: doc, error } = await supabase.from("documents").insert({ ...data, user_id: user.id }).select().single();
-            if (error) { showToast("Erreur"); return; }
-            if (data.lignes?.length) await supabase.from("lignes").insert(data.lignes.map(l => ({ ...l, document_id: doc.id })));
+if (error) { showToast("Erreur: " + error.message); return; }            if (data.lignes?.length) await supabase.from("lignes").insert(data.lignes.map(l => ({ ...l, document_id: doc.id })));
             await loadAll(); showToast("Devis créé ! ✓"); setView("documents");
           }}
         />
