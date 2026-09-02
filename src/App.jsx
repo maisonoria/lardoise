@@ -1,22 +1,20 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import {
-  LayoutDashboard, FileText, Bell, Settings, Plus, Trash2, Send,
-  ArrowLeft, CheckCircle2, Clock, AlertTriangle, Download, Eye,
-  Menu, X, ChevronRight, Building2, Mail, Lock, Sparkles, Info
+  LayoutDashboard, FileText, Bell, Settings, Plus, Trash2,
+  ArrowLeft, CheckCircle2, X, Menu, ChevronRight, TrendingUp,
+  Clock, AlertTriangle, Users
 } from "lucide-react";
 
-// ---------- Supabase ----------
 const SUPABASE_URL = "https://wbpfykonxqkpgkhlwkhy.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndicGZ5a29ueHFrcGdraGx3a2h5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgwNDI4MzUsImV4cCI6MjEwMzYxODgzNX0.rg29B9fuDBFThwKqrXXARAPEFKntdDKCR6-VbBaVPTM";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-// ---------- Palette ----------
 const C = {
   ink: "#16263A", inkSoft: "#55677A", blue: "#2C5B76", blueDeep: "#1D4155",
   accent: "#E8720C", accentSoft: "#FCE4CC", green: "#2E8B57", greenSoft: "#DEF2E6",
   late: "#C13B2F", lateSoft: "#FBE1DC", panel: "#EEF1F3", panel2: "#F6F7F8",
-  line: "#D7DCE1", vu: "#5B4EA6", vuSoft: "#E7E3F6",
+  line: "#D7DCE1", vu: "#5B4EA6", vuSoft: "#E7E3F6", white: "#ffffff",
 };
 
 const STATUS_STYLE = {
@@ -30,43 +28,25 @@ const STATUS_STYLE = {
 
 const euro = (n) => Number(n || 0).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 const todayISO = () => new Date().toISOString().slice(0, 10);
-const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
+const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : "—";
 const totalTTC = (lignes) => (lignes || []).reduce((s, l) => s + Number(l.qte) * Number(l.pu) * (1 + Number(l.tva) / 100), 0);
+const uid = () => Math.random().toString(36).slice(2, 9);
 
-// ---------- UI Composants ----------
 function Badge({ statut }) {
   const s = STATUS_STYLE[statut] || STATUS_STYLE.Brouillon;
-  return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap" style={{ background: s.bg, color: s.fg }}>{statut}</span>;
+  return <span style={{ background: s.bg, color: s.fg, fontSize: 11, padding: "3px 10px", borderRadius: 20, fontWeight: 600, whiteSpace: "nowrap" }}>{statut}</span>;
 }
-
-function Btn({ children, variant = "primary", className = "", style = {}, loading = false, ...props }) {
-  const base = "inline-flex items-center justify-center gap-2 font-semibold rounded-xl px-4 py-2.5 text-sm transition active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed";
-  const styles = {
-    primary: { background: C.accent, color: "#fff" },
-    dark: { background: C.ink, color: "#fff" },
-    ghost: { background: "#fff", color: C.ink, border: `1px solid ${C.line}` },
-    subtle: { background: C.panel2, color: C.ink },
-  };
-  return <button className={base + " " + className} style={{ ...styles[variant], ...style }} disabled={loading} {...props}>{loading ? "..." : children}</button>;
-}
-
-function Card({ children, className = "", style = {} }) {
-  return <div className={"bg-white rounded-2xl border " + className} style={{ borderColor: C.line, ...style }}>{children}</div>;
-}
-
-function Field({ label, children }) {
-  return <label className="block mb-4"><span className="block text-xs font-semibold mb-1.5" style={{ color: C.inkSoft }}>{label}</span>{children}</label>;
-}
-
-const inputCls = "w-full px-3.5 py-2.5 rounded-lg text-sm outline-none border bg-white focus:border-blue-400";
-const inputStyle = { borderColor: C.line, color: C.ink };
 
 function Toast({ msg, onClose }) {
   useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t); }, [onClose]);
-  return <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-xl text-sm font-semibold text-white" style={{ background: C.ink }}>{msg}</div>;
+  return (
+    <div style={{ position: "fixed", bottom: 90, left: "50%", transform: "translateX(-50%)", background: C.ink, color: "#fff", padding: "12px 20px", borderRadius: 14, fontSize: 14, fontWeight: 600, zIndex: 100, boxShadow: "0 4px 20px rgba(0,0,0,0.2)", whiteSpace: "nowrap" }}>
+      {msg}
+    </div>
+  );
 }
 
-// ---------- AUTH ----------
+// AUTH
 function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
@@ -77,81 +57,463 @@ function AuthScreen({ onAuth }) {
   const handle = async () => {
     setLoading(true); setError("");
     try {
-      let res;
-      if (mode === "login") {
-        res = await supabase.auth.signInWithPassword({ email, password });
-      } else {
-        res = await supabase.auth.signUp({ email, password });
-      }
+      const res = mode === "login"
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({ email, password });
       if (res.error) throw res.error;
       if (res.data?.user) onAuth(res.data.user);
       else setError("Vérifiez votre email pour confirmer votre inscription.");
-    } catch (e) {
-      setError(e.message || "Erreur de connexion");
-    }
+    } catch (e) { setError(e.message || "Erreur"); }
     setLoading(false);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: C.panel2 }}>
-      <div className="w-full max-w-sm">
-        <div className="flex items-center gap-3 mb-8 justify-center">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-sm" style={{ background: C.ink, color: C.accent, fontFamily: "IBM Plex Mono, monospace" }}>A</div>
-          <span className="text-xl font-bold" style={{ fontFamily: "Space Grotesk, sans-serif", color: C.ink }}>L'Ardoise</span>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.panel2, padding: 20 }}>
+      <div style={{ width: "100%", maxWidth: 380 }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ width: 52, height: 52, background: C.ink, borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", fontSize: 22, fontWeight: 800, color: C.accent, fontFamily: "monospace" }}>A</div>
+          <h1 style={{ fontSize: 26, fontWeight: 800, color: C.ink, margin: 0 }}>L'Ardoise</h1>
+          <p style={{ fontSize: 14, color: C.inkSoft, margin: "4px 0 0" }}>Devis & factures en 2 minutes</p>
         </div>
-        <Card className="p-6">
-          <h1 className="text-lg font-bold mb-1" style={{ color: C.ink }}>{mode === "login" ? "Connexion" : "Créer un compte"}</h1>
-          <p className="text-sm mb-5" style={{ color: C.inkSoft }}>{mode === "login" ? "Content de vous revoir !" : "Gratuit, sans carte bancaire."}</p>
-          {error && <div className="mb-4 p-3 rounded-lg text-sm" style={{ background: C.lateSoft, color: C.late }}>{error}</div>}
-          <Field label="Email"><input className={inputCls} style={inputStyle} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vous@email.fr" /></Field>
-          <Field label="Mot de passe"><input className={inputCls} style={inputStyle} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === "Enter" && handle()} /></Field>
-          <Btn variant="dark" className="w-full mt-2" onClick={handle} loading={loading}>{mode === "login" ? "Se connecter" : "Créer mon compte"}</Btn>
-          <p className="text-center text-xs mt-4" style={{ color: C.inkSoft }}>
+        <div style={{ background: "#fff", borderRadius: 20, padding: 24, boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: C.ink, margin: "0 0 4px" }}>{mode === "login" ? "Connexion" : "Créer un compte"}</h2>
+          <p style={{ fontSize: 13, color: C.inkSoft, margin: "0 0 20px" }}>{mode === "login" ? "Content de vous revoir !" : "Gratuit, sans carte bancaire."}</p>
+          {error && <div style={{ background: C.lateSoft, color: C.late, padding: "10px 14px", borderRadius: 10, fontSize: 13, marginBottom: 16 }}>{error}</div>}
+          <label style={{ display: "block", marginBottom: 14 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: C.inkSoft, display: "block", marginBottom: 6 }}>EMAIL</span>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vous@email.fr" style={{ width: "100%", padding: "14px 16px", borderRadius: 12, border: `1.5px solid ${C.line}`, fontSize: 16, outline: "none", boxSizing: "border-box", color: C.ink }} />
+          </label>
+          <label style={{ display: "block", marginBottom: 20 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: C.inkSoft, display: "block", marginBottom: 6 }}>MOT DE PASSE</span>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === "Enter" && handle()} style={{ width: "100%", padding: "14px 16px", borderRadius: 12, border: `1.5px solid ${C.line}`, fontSize: 16, outline: "none", boxSizing: "border-box", color: C.ink }} />
+          </label>
+          <button onClick={handle} disabled={loading} style={{ width: "100%", padding: "16px", background: C.ink, color: "#fff", borderRadius: 14, fontSize: 16, fontWeight: 700, border: "none", cursor: "pointer" }}>
+            {loading ? "..." : mode === "login" ? "Se connecter" : "Créer mon compte"}
+          </button>
+          <p style={{ textAlign: "center", fontSize: 13, color: C.inkSoft, marginTop: 16 }}>
             {mode === "login" ? "Pas encore de compte ? " : "Déjà un compte ? "}
-            <button className="font-semibold underline" style={{ color: C.blue }} onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); }}>
+            <button onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); }} style={{ color: C.blue, fontWeight: 600, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
               {mode === "login" ? "S'inscrire" : "Se connecter"}
             </button>
           </p>
-        </Card>
+        </div>
       </div>
     </div>
   );
 }
 
-// ---------- APP PRINCIPALE ----------
+// BOTTOM NAV
+function BottomNav({ view, setView }) {
+  const items = [
+    { id: "dashboard", icon: LayoutDashboard, label: "Accueil" },
+    { id: "documents", icon: FileText, label: "Documents" },
+    { id: "relances", icon: Bell, label: "Relances" },
+    { id: "settings", icon: Settings, label: "Réglages" },
+  ];
+  return (
+    <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#fff", borderTop: `1px solid ${C.line}`, display: "flex", zIndex: 50, paddingBottom: "env(safe-area-inset-bottom)" }}>
+      {items.map(n => (
+        <button key={n.id} onClick={() => setView(n.id)} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "10px 0 8px", background: "none", border: "none", cursor: "pointer", color: view === n.id ? C.ink : C.inkSoft }}>
+          <n.icon size={22} strokeWidth={view === n.id ? 2.5 : 1.8} />
+          <span style={{ fontSize: 10, fontWeight: view === n.id ? 700 : 400, marginTop: 3 }}>{n.label}</span>
+          {view === n.id && <div style={{ width: 4, height: 4, borderRadius: 2, background: C.accent, marginTop: 3 }} />}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+// FAB
+function FAB({ onClick }) {
+  return (
+    <button onClick={onClick} style={{ position: "fixed", bottom: 80, right: 20, width: 56, height: 56, borderRadius: 28, background: C.accent, color: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(232,114,12,0.4)", zIndex: 40 }}>
+      <Plus size={26} strokeWidth={2.5} />
+    </button>
+  );
+}
+
+// DASHBOARD
+function Dashboard({ documents, clients, setView }) {
+  const ca = documents.filter(d => d.type === "facture" && d.statut === "Payé").reduce((s, d) => s + totalTTC(d.lignes), 0);
+  const attente = documents.filter(d => d.type === "facture" && !["Payé", "Brouillon"].includes(d.statut)).reduce((s, d) => s + totalTTC(d.lignes), 0);
+  const retard = documents.filter(d => d.statut === "En retard").length;
+  const recent = documents.slice(0, 3);
+
+  return (
+    <div style={{ padding: "0 16px 100px" }}>
+      {/* Header */}
+      <div style={{ padding: "20px 0 16px" }}>
+        <p style={{ fontSize: 13, color: C.inkSoft, margin: 0 }}>Bonjour 👋</p>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: C.ink, margin: "2px 0 0", fontFamily: "system-ui" }}>Tableau de bord</h1>
+      </div>
+
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+        {[
+          { label: "CA encaissé", val: euro(ca), color: C.green, icon: TrendingUp },
+          { label: "En attente", val: euro(attente), color: C.accent, icon: Clock },
+          { label: "Total clients", val: clients.length, color: C.blue, icon: Users },
+          { label: "En retard", val: retard, color: C.late, icon: AlertTriangle },
+        ].map(s => (
+          <div key={s.label} style={{ background: "#fff", borderRadius: 16, padding: "16px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 10, background: s.color + "18", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <s.icon size={16} color={s.color} />
+              </div>
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: s.color, fontFamily: "monospace", lineHeight: 1 }}>{s.val}</div>
+            <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 4 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Récents */}
+      {recent.length > 0 && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.ink, margin: 0 }}>Récents</h2>
+            <button onClick={() => setView("documents")} style={{ fontSize: 13, color: C.blue, background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Voir tout →</button>
+          </div>
+          <div style={{ background: "#fff", borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+            {recent.map((d, i) => (
+              <div key={d.id} style={{ padding: "14px 16px", borderBottom: i < recent.length - 1 ? `1px solid ${C.line}` : "none", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: C.ink }}>N°{d.numero}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                    <Badge statut={d.statut} />
+                    <span style={{ fontSize: 12, color: C.inkSoft }}>{fmtDate(d.date_creation)}</span>
+                  </div>
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: C.blueDeep, fontFamily: "monospace" }}>{euro(totalTTC(d.lignes))}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {recent.length === 0 && (
+        <div style={{ textAlign: "center", padding: "40px 20px", background: "#fff", borderRadius: 20 }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+          <p style={{ fontSize: 15, fontWeight: 600, color: C.ink, margin: "0 0 6px" }}>Aucun document</p>
+          <p style={{ fontSize: 13, color: C.inkSoft, margin: 0 }}>Créez votre premier devis avec le bouton +</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// LISTE DOCUMENTS
+function DocumentsList({ documents, clients, onOpen, showToast, loadAll }) {
+  const [filter, setFilter] = useState("Tous");
+  const statuts = ["Tous", "Brouillon", "Envoyé", "Accepté", "Payé", "En retard"];
+  const filtered = filter === "Tous" ? documents : documents.filter(d => d.statut === filter);
+  const getClient = id => clients.find(c => c.id === id);
+
+  const deleteDoc = async (id, e) => {
+    e.stopPropagation();
+    if (!confirm("Supprimer ?")) return;
+    await supabase.from("documents").delete().eq("id", id);
+    await loadAll(); showToast("Supprimé.");
+  };
+
+  return (
+    <div style={{ padding: "0 0 100px" }}>
+      <div style={{ padding: "20px 16px 12px" }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: C.ink, margin: 0 }}>Devis & Factures</h1>
+      </div>
+
+      {/* Filtres scrollables */}
+      <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "0 16px 16px", scrollbarWidth: "none" }}>
+        {statuts.map(s => (
+          <button key={s} onClick={() => setFilter(s)} style={{ flexShrink: 0, padding: "8px 16px", borderRadius: 20, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", background: filter === s ? C.ink : "#fff", color: filter === s ? "#fff" : C.inkSoft, boxShadow: "0 2px 6px rgba(0,0,0,0.08)" }}>
+            {s}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ padding: "0 16px" }}>
+        {filtered.length === 0 && (
+          <div style={{ textAlign: "center", padding: "40px 20px", background: "#fff", borderRadius: 20 }}>
+            <p style={{ fontSize: 14, color: C.inkSoft }}>Aucun document dans cette catégorie.</p>
+          </div>
+        )}
+        {filtered.map(d => (
+          <div key={d.id} onClick={() => onOpen(d.id)} style={{ background: "#fff", borderRadius: 16, padding: "16px", marginBottom: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.06)", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>N°{d.numero}</span>
+                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: C.panel, color: C.inkSoft, fontWeight: 500 }}>{d.type}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Badge statut={d.statut} />
+                <span style={{ fontSize: 12, color: C.inkSoft }}>{getClient(d.client_id)?.nom || "—"}</span>
+              </div>
+            </div>
+            <div style={{ textAlign: "right", flexShrink: 0 }}>
+              <div style={{ fontSize: 17, fontWeight: 800, color: C.blueDeep, fontFamily: "monospace" }}>{euro(totalTTC(d.lignes))}</div>
+              <div style={{ fontSize: 11, color: C.inkSoft, marginTop: 2 }}>{fmtDate(d.date_creation)}</div>
+            </div>
+            <button onClick={e => deleteDoc(d.id, e)} style={{ padding: 8, background: C.lateSoft, border: "none", borderRadius: 10, cursor: "pointer", color: C.late, flexShrink: 0 }}>
+              <Trash2 size={15} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// FORMULAIRE DOCUMENT
+function DocumentForm({ doc, clients, prestations, user, onBack, onSave }) {
+  const [type, setType] = useState(doc?.type || "devis");
+  const [statut, setStatut] = useState(doc?.statut || "Brouillon");
+  const [clientId, setClientId] = useState(doc?.client_id || "");
+  const [dateCreation, setDateCreation] = useState(doc?.date_creation || todayISO());
+  const [dateEcheance, setDateEcheance] = useState(doc?.date_echeance || "");
+  const [lignes, setLignes] = useState(doc?.lignes?.length ? doc.lignes : [{ id: uid(), designation: "", qte: 1, pu: 0, tva: 20 }]);
+  const [saving, setSaving] = useState(false);
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [newClient, setNewClient] = useState({ nom: "", email: "", tel: "" });
+  const numero = doc?.numero || `${new Date().getFullYear()}-${String(Math.floor(Math.random() * 900) + 100)}`;
+  const total = totalTTC(lignes);
+
+  const addLigne = () => setLignes(l => [...l, { id: uid(), designation: "", qte: 1, pu: 0, tva: 20 }]);
+  const removeLigne = id => setLignes(l => l.filter(x => x.id !== id));
+  const updateLigne = (id, key, val) => setLignes(l => l.map(x => x.id === id ? { ...x, [key]: val } : x));
+
+  const addClient = async () => {
+    if (!newClient.nom.trim()) return;
+    const { data } = await supabase.from("clients").insert({ ...newClient, user_id: user.id }).select().single();
+    if (data) { setClientId(data.id); setShowNewClient(false); }
+  };
+
+  const save = async () => {
+    setSaving(true);
+    await onSave({ numero, type, statut, client_id: clientId || null, date_creation: dateCreation, date_echeance: dateEcheance || null, lignes });
+    setSaving(false);
+  };
+
+  const inputStyle = { width: "100%", padding: "14px 16px", borderRadius: 12, border: `1.5px solid ${C.line}`, fontSize: 16, outline: "none", boxSizing: "border-box", color: C.ink, background: "#fff" };
+  const labelStyle = { display: "block", marginBottom: 14 };
+  const labelTextStyle = { fontSize: 12, fontWeight: 600, color: C.inkSoft, display: "block", marginBottom: 6 };
+
+  return (
+    <div style={{ padding: "0 0 120px" }}>
+      {/* Header */}
+      <div style={{ padding: "16px 16px 12px", display: "flex", alignItems: "center", gap: 12, borderBottom: `1px solid ${C.line}`, background: "#fff", position: "sticky", top: 0, zIndex: 10 }}>
+        <button onClick={onBack} style={{ width: 40, height: 40, borderRadius: 12, background: C.panel, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <ArrowLeft size={20} color={C.ink} />
+        </button>
+        <div>
+          <h1 style={{ fontSize: 17, fontWeight: 700, color: C.ink, margin: 0 }}>{doc ? "Modifier" : "Nouveau"} — N°{numero}</h1>
+        </div>
+      </div>
+
+      <div style={{ padding: "16px" }}>
+        {/* Type + Statut */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 4 }}>
+          <label style={labelStyle}>
+            <span style={labelTextStyle}>TYPE</span>
+            <select value={type} onChange={e => setType(e.target.value)} style={inputStyle}>
+              <option value="devis">Devis</option>
+              <option value="facture">Facture</option>
+            </select>
+          </label>
+          <label style={labelStyle}>
+            <span style={labelTextStyle}>STATUT</span>
+            <select value={statut} onChange={e => setStatut(e.target.value)} style={inputStyle}>
+              {Object.keys(STATUS_STYLE).map(s => <option key={s}>{s}</option>)}
+            </select>
+          </label>
+        </div>
+
+        {/* Dates */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 4 }}>
+          <label style={labelStyle}>
+            <span style={labelTextStyle}>DATE</span>
+            <input type="date" value={dateCreation} onChange={e => setDateCreation(e.target.value)} style={inputStyle} />
+          </label>
+          <label style={labelStyle}>
+            <span style={labelTextStyle}>ÉCHÉANCE</span>
+            <input type="date" value={dateEcheance} onChange={e => setDateEcheance(e.target.value)} style={inputStyle} />
+          </label>
+        </div>
+
+        {/* Client */}
+        <label style={labelStyle}>
+          <span style={labelTextStyle}>CLIENT</span>
+          <select value={clientId} onChange={e => setClientId(e.target.value)} style={inputStyle}>
+            <option value="">— Sélectionner —</option>
+            {clients.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+          </select>
+        </label>
+        <button onClick={() => setShowNewClient(!showNewClient)} style={{ fontSize: 13, color: C.blue, background: "none", border: "none", cursor: "pointer", fontWeight: 600, marginBottom: 16, padding: 0 }}>
+          + Nouveau client
+        </button>
+
+        {showNewClient && (
+          <div style={{ background: C.panel2, borderRadius: 16, padding: 16, marginBottom: 16 }}>
+            {[["NOM", "nom", "text"], ["EMAIL", "email", "email"], ["TÉLÉPHONE", "tel", "tel"]].map(([lbl, key, type]) => (
+              <label key={key} style={labelStyle}>
+                <span style={labelTextStyle}>{lbl}</span>
+                <input type={type} value={newClient[key]} onChange={e => setNewClient(n => ({ ...n, [key]: e.target.value }))} style={inputStyle} />
+              </label>
+            ))}
+            <button onClick={addClient} style={{ width: "100%", padding: 14, background: C.ink, color: "#fff", borderRadius: 12, fontSize: 15, fontWeight: 700, border: "none", cursor: "pointer" }}>Créer le client</button>
+          </div>
+        )}
+
+        {/* Lignes */}
+        <h2 style={{ fontSize: 15, fontWeight: 700, color: C.ink, margin: "0 0 12px" }}>Prestations</h2>
+        {lignes.map(l => (
+          <div key={l.id} style={{ background: "#fff", borderRadius: 16, padding: 14, marginBottom: 10, boxShadow: "0 2px 6px rgba(0,0,0,0.06)" }}>
+            <label style={labelStyle}>
+              <span style={labelTextStyle}>DÉSIGNATION</span>
+              <input value={l.designation} onChange={e => updateLigne(l.id, "designation", e.target.value)} placeholder="Ex: Installation électrique..." style={inputStyle} />
+            </label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+              <label style={labelStyle}>
+                <span style={labelTextStyle}>QTÉ</span>
+                <input type="number" value={l.qte} onChange={e => updateLigne(l.id, "qte", e.target.value)} style={inputStyle} />
+              </label>
+              <label style={labelStyle}>
+                <span style={labelTextStyle}>PU HT</span>
+                <input type="number" value={l.pu} onChange={e => updateLigne(l.id, "pu", e.target.value)} style={inputStyle} />
+              </label>
+              <label style={labelStyle}>
+                <span style={labelTextStyle}>TVA %</span>
+                <input type="number" value={l.tva} onChange={e => updateLigne(l.id, "tva", e.target.value)} style={inputStyle} />
+              </label>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: C.blueDeep, fontFamily: "monospace" }}>{euro(l.qte * l.pu * (1 + l.tva / 100))}</span>
+              <button onClick={() => removeLigne(l.id)} style={{ padding: 8, background: C.lateSoft, border: "none", borderRadius: 10, cursor: "pointer", color: C.late }}>
+                <Trash2 size={15} />
+              </button>
+            </div>
+          </div>
+        ))}
+
+        <button onClick={addLigne} style={{ width: "100%", padding: 14, background: C.panel2, color: C.ink, borderRadius: 14, fontSize: 15, fontWeight: 600, border: `1.5px dashed ${C.line}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
+          <Plus size={18} /> Ajouter une prestation
+        </button>
+
+        {/* Total */}
+        <div style={{ background: C.ink, borderRadius: 16, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <span style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>Total TTC</span>
+          <span style={{ fontSize: 24, fontWeight: 800, color: "#fff", fontFamily: "monospace" }}>{euro(total)}</span>
+        </div>
+
+        {/* Bouton save */}
+        <button onClick={save} disabled={saving} style={{ width: "100%", padding: 18, background: C.accent, color: "#fff", borderRadius: 16, fontSize: 17, fontWeight: 800, border: "none", cursor: "pointer", boxShadow: "0 4px 16px rgba(232,114,12,0.35)" }}>
+          {saving ? "Enregistrement..." : "✓ Enregistrer"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// RELANCES
+function RelancesView({ documents, clients, settings, setSettings }) {
+  const factures = documents.filter(d => d.type === "facture" && d.statut !== "Payé");
+  return (
+    <div style={{ padding: "0 16px 100px" }}>
+      <div style={{ padding: "20px 0 16px" }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: C.ink, margin: 0 }}>Relances</h1>
+      </div>
+      <div style={{ background: "#fff", borderRadius: 16, padding: 16, marginBottom: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>Relances automatiques</div>
+            <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2 }}>Email envoyé aux clients en retard</div>
+          </div>
+          <button onClick={() => setSettings(s => ({ ...s, actif: !s.actif }))} style={{ width: 50, height: 28, borderRadius: 14, background: settings.actif ? C.green : C.line, border: "none", cursor: "pointer", position: "relative", transition: "background 0.2s" }}>
+            <span style={{ position: "absolute", top: 3, width: 22, height: 22, borderRadius: 11, background: "#fff", transition: "left 0.2s", left: settings.actif ? 25 : 3 }} />
+          </button>
+        </div>
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 16, padding: 16, marginBottom: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.ink, marginBottom: 14 }}>Délais de relance</div>
+        {[{ key: "j1", label: "1er rappel" }, { key: "j2", label: "2e rappel" }, { key: "j3", label: "Mise en demeure" }].map(r => (
+          <div key={r.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 12, marginBottom: 12, borderBottom: `1px solid ${C.line}` }}>
+            <span style={{ fontSize: 14, color: C.ink }}>{r.label}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, color: C.inkSoft }}>J+</span>
+              <input type="number" value={settings[r.key]} onChange={e => setSettings(s => ({ ...s, [r.key]: parseInt(e.target.value) || 0 }))} style={{ width: 60, padding: "8px 10px", borderRadius: 10, border: `1.5px solid ${C.line}`, fontSize: 15, textAlign: "center", outline: "none" }} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 16, padding: 16, boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.ink, marginBottom: 12 }}>Factures suivies ({factures.length})</div>
+        {factures.length === 0 && <p style={{ fontSize: 13, color: C.inkSoft, margin: 0 }}>Aucune facture en attente. 🎉</p>}
+        {factures.map(f => (
+          <div key={f.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 10, marginBottom: 10, borderBottom: `1px solid ${C.line}` }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.ink }}>N°{f.numero}</div>
+              <div style={{ fontSize: 12, color: C.inkSoft }}>{clients.find(c => c.id === f.client_id)?.nom || "—"}</div>
+            </div>
+            <Badge statut={f.statut} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// SETTINGS
+function SettingsView({ entreprise, setEntreprise, showToast, onLogout }) {
+  const set = (k, v) => setEntreprise(e => ({ ...e, [k]: v }));
+  const inputStyle = { width: "100%", padding: "14px 16px", borderRadius: 12, border: `1.5px solid ${C.line}`, fontSize: 16, outline: "none", boxSizing: "border-box", color: C.ink };
+
+  return (
+    <div style={{ padding: "0 16px 100px" }}>
+      <div style={{ padding: "20px 0 16px" }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: C.ink, margin: 0 }}>Réglages</h1>
+      </div>
+      <div style={{ background: "#fff", borderRadius: 16, padding: 16, marginBottom: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.ink, marginBottom: 14 }}>Mon entreprise</div>
+        {[["Nom de l'entreprise", "nom"], ["SIRET", "siret"], ["Assurance décennale", "assurance"], ["N° RGE", "rge"], ["IBAN", "iban"]].map(([label, key]) => (
+          <label key={key} style={{ display: "block", marginBottom: 12 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: C.inkSoft, display: "block", marginBottom: 6 }}>{label.toUpperCase()}</span>
+            <input value={entreprise[key] || ""} onChange={e => set(key, e.target.value)} style={inputStyle} />
+          </label>
+        ))}
+        <button onClick={() => showToast("Enregistré !")} style={{ width: "100%", padding: 16, background: C.ink, color: "#fff", borderRadius: 14, fontSize: 16, fontWeight: 700, border: "none", cursor: "pointer", marginTop: 4 }}>
+          Enregistrer
+        </button>
+      </div>
+      <button onClick={onLogout} style={{ width: "100%", padding: 16, background: C.lateSoft, color: C.late, borderRadius: 14, fontSize: 16, fontWeight: 700, border: "none", cursor: "pointer" }}>
+        Se déconnecter
+      </button>
+    </div>
+  );
+}
+
+// APP PRINCIPALE
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("dashboard");
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [clients, setClients] = useState([]);
   const [prestations, setPrestations] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [currentDocId, setCurrentDocId] = useState(null);
-  const [filterStatut, setFilterStatut] = useState("Tous");
   const [reminderSettings, setReminderSettings] = useState({ actif: true, j1: 7, j2: 15, j3: 30 });
   const [entreprise, setEntreprise] = useState({ nom: "", siret: "", assurance: "", rge: "", iban: "" });
 
-  const showToast = (msg) => setToast(msg);
+  const showToast = msg => setToast(msg);
 
-  // Auth listener
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user || null);
-      setLoading(false);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
-      setUser(session?.user || null);
-    });
+    supabase.auth.getSession().then(({ data }) => { setUser(data.session?.user || null); setLoading(false); });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setUser(session?.user || null));
     return () => subscription.unsubscribe();
   }, []);
 
-  // Load data
-  useEffect(() => {
-    if (!user) return;
-    loadAll();
-  }, [user]);
+  useEffect(() => { if (user) loadAll(); }, [user]);
 
   const loadAll = async () => {
     const [{ data: cls }, { data: prs }, { data: docs }] = await Promise.all([
@@ -166,346 +528,47 @@ export default function App() {
 
   const logout = async () => { await supabase.auth.signOut(); setUser(null); };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center" style={{ color: C.inkSoft }}>Chargement…</div>;
+  if (loading) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: C.inkSoft, fontSize: 16 }}>Chargement…</div>;
   if (!user) return <AuthScreen onAuth={setUser} />;
 
   const currentDoc = documents.find(d => d.id === currentDocId);
-  const navItems = [
-    { id: "dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
-    { id: "documents", icon: FileText, label: "Devis & Factures" },
-    { id: "relances", icon: Bell, label: "Relances" },
-    { id: "settings", icon: Settings, label: "Réglages" },
-  ];
+  const isForm = view === "newdoc" || view === "editdoc";
 
   return (
-    <div className="min-h-screen flex" style={{ background: C.panel2, fontFamily: "Inter, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: C.panel2, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", maxWidth: 480, margin: "0 auto" }}>
       {toast && <Toast msg={toast} onClose={() => setToast(null)} />}
 
-      {/* Sidebar desktop */}
-      <aside className="hidden md:flex flex-col w-56 shrink-0 border-r py-6 px-4" style={{ background: "#fff", borderColor: C.line }}>
-        <div className="flex items-center gap-2.5 mb-8 px-2">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold" style={{ background: C.ink, color: C.accent, fontFamily: "IBM Plex Mono, monospace" }}>A</div>
-          <span className="font-bold text-base" style={{ fontFamily: "Space Grotesk, sans-serif", color: C.ink }}>L'Ardoise</span>
-        </div>
-        {navItems.map(n => (
-          <button key={n.id} onClick={() => setView(n.id)} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium mb-1 transition" style={{ background: view === n.id ? C.panel : "transparent", color: view === n.id ? C.ink : C.inkSoft }}>
-            <n.icon size={17} />{n.label}
-          </button>
-        ))}
-        <div className="mt-auto">
-          <button onClick={logout} className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs w-full" style={{ color: C.inkSoft }}>
-            <X size={14} /> Déconnexion
-          </button>
-        </div>
-      </aside>
+      {view === "dashboard" && <Dashboard documents={documents} clients={clients} setView={setView} />}
+      {view === "documents" && <DocumentsList documents={documents} clients={clients} onOpen={id => { setCurrentDocId(id); setView("editdoc"); }} showToast={showToast} loadAll={loadAll} />}
+      {view === "newdoc" && (
+        <DocumentForm doc={null} clients={clients} prestations={prestations} user={user}
+          onBack={() => setView("documents")}
+          onSave={async data => {
+            const { data: doc, error } = await supabase.from("documents").insert({ ...data, user_id: user.id }).select().single();
+            if (error) { showToast("Erreur"); return; }
+            if (data.lignes?.length) await supabase.from("lignes").insert(data.lignes.map(l => ({ ...l, document_id: doc.id })));
+            await loadAll(); showToast("Devis créé ! ✓"); setView("documents");
+          }}
+        />
+      )}
+      {view === "editdoc" && currentDoc && (
+        <DocumentForm doc={currentDoc} clients={clients} prestations={prestations} user={user}
+          onBack={() => { setCurrentDocId(null); setView("documents"); }}
+          onSave={async data => {
+            await supabase.from("documents").update({ ...data, lignes: undefined }).eq("id", currentDoc.id);
+            await supabase.from("lignes").delete().eq("document_id", currentDoc.id);
+            if (data.lignes?.length) await supabase.from("lignes").insert(data.lignes.map(l => ({ ...l, document_id: currentDoc.id })));
+            await loadAll(); showToast("Enregistré ! ✓"); setCurrentDocId(null); setView("documents");
+          }}
+        />
+      )}
+      {view === "relances" && <RelancesView documents={documents} clients={clients} settings={reminderSettings} setSettings={setReminderSettings} />}
+      {view === "settings" && <SettingsView entreprise={entreprise} setEntreprise={setEntreprise} showToast={showToast} onLogout={logout} />}
 
-      {/* Main */}
-      <main className="flex-1 overflow-auto">
-        {/* Mobile header */}
-        <header className="md:hidden flex items-center justify-between px-4 py-3 border-b bg-white" style={{ borderColor: C.line }}>
-          <span className="font-bold" style={{ fontFamily: "Space Grotesk, sans-serif" }}>L'Ardoise</span>
-          <button onClick={() => setMobileNavOpen(!mobileNavOpen)}>{mobileNavOpen ? <X size={22} /> : <Menu size={22} />}</button>
-        </header>
-        {mobileNavOpen && (
-          <div className="md:hidden bg-white border-b px-4 pb-4" style={{ borderColor: C.line }}>
-            {navItems.map(n => (
-              <button key={n.id} onClick={() => { setView(n.id); setMobileNavOpen(false); }} className="flex items-center gap-3 py-3 text-sm font-medium w-full border-b last:border-0" style={{ borderColor: C.line, color: view === n.id ? C.ink : C.inkSoft }}>
-                <n.icon size={17} />{n.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="p-4 md:p-8">
-          {view === "dashboard" && <Dashboard documents={documents} clients={clients} setView={setView} />}
-          {view === "documents" && !currentDocId && (
-            <DocumentsList
-              documents={documents} clients={clients} filterStatut={filterStatut}
-              setFilterStatut={setFilterStatut}
-              onNew={() => { setCurrentDocId(null); setView("newdoc"); }}
-              onOpen={(id) => { setCurrentDocId(id); setView("editdoc"); }}
-              showToast={showToast} loadAll={loadAll} user={user}
-            />
-          )}
-          {view === "newdoc" && (
-            <DocumentForm
-              doc={null} clients={clients} prestations={prestations} user={user}
-              onBack={() => setView("documents")}
-              onSave={async (data) => {
-                const { data: doc, error } = await supabase.from("documents").insert({ ...data, user_id: user.id }).select().single();
-                if (error) { showToast("Erreur : " + error.message); return; }
-                if (data.lignes?.length) {
-                  await supabase.from("lignes").insert(data.lignes.map(l => ({ ...l, document_id: doc.id })));
-                }
-                await loadAll(); showToast("Document créé !"); setView("documents");
-              }}
-            />
-          )}
-          {view === "editdoc" && currentDoc && (
-            <DocumentForm
-              doc={currentDoc} clients={clients} prestations={prestations} user={user}
-              onBack={() => { setCurrentDocId(null); setView("documents"); }}
-              onSave={async (data) => {
-                await supabase.from("documents").update({ ...data, lignes: undefined }).eq("id", currentDoc.id);
-                await supabase.from("lignes").delete().eq("document_id", currentDoc.id);
-                if (data.lignes?.length) {
-                  await supabase.from("lignes").insert(data.lignes.map(l => ({ ...l, document_id: currentDoc.id })));
-                }
-                await loadAll(); showToast("Enregistré !"); setCurrentDocId(null); setView("documents");
-              }}
-            />
-          )}
-          {view === "relances" && <RelancesView documents={documents} clients={clients} settings={reminderSettings} setSettings={setReminderSettings} />}
-          {view === "settings" && <SettingsView entreprise={entreprise} setEntreprise={setEntreprise} showToast={showToast} onLogout={logout} />}
-        </div>
-      </main>
-    </div>
-  );
-}
-
-// ---------- Dashboard ----------
-function Dashboard({ documents, clients, setView }) {
-  const ca = documents.filter(d => d.type === "facture" && d.statut === "Payé").reduce((s, d) => s + totalTTC(d.lignes), 0);
-  const attente = documents.filter(d => d.type === "facture" && d.statut !== "Payé" && d.statut !== "Brouillon").reduce((s, d) => s + totalTTC(d.lignes), 0);
-  const retard = documents.filter(d => d.statut === "En retard").length;
-  const devisEnCours = documents.filter(d => d.type === "devis" && d.statut === "Envoyé").length;
-
-  return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6" style={{ fontFamily: "Space Grotesk, sans-serif", color: C.ink }}>Tableau de bord</h1>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        {[
-          { label: "CA encaissé", val: euro(ca), color: C.green },
-          { label: "En attente", val: euro(attente), color: C.accent },
-          { label: "Devis en cours", val: devisEnCours, color: C.blue },
-          { label: "Retards", val: retard, color: C.late },
-        ].map(s => (
-          <Card key={s.label} className="p-4">
-            <div className="text-xs mb-1 font-medium" style={{ color: C.inkSoft }}>{s.label}</div>
-            <div className="text-2xl font-bold" style={{ color: s.color, fontFamily: "IBM Plex Mono, monospace" }}>{s.val}</div>
-          </Card>
-        ))}
-      </div>
-      <div className="flex gap-3 flex-wrap">
-        <Btn variant="primary" onClick={() => setView("newdoc")}><Plus size={16} /> Nouveau devis</Btn>
-        <Btn variant="ghost" onClick={() => setView("documents")}><FileText size={16} /> Voir tout</Btn>
-      </div>
-    </div>
-  );
-}
-
-// ---------- Liste documents ----------
-function DocumentsList({ documents, clients, filterStatut, setFilterStatut, onNew, onOpen, showToast, loadAll, user }) {
-  const statuts = ["Tous", "Brouillon", "Envoyé", "Accepté", "Payé", "En retard"];
-  const filtered = filterStatut === "Tous" ? documents : documents.filter(d => d.statut === filterStatut);
-  const getClient = (id) => clients.find(c => c.id === id);
-
-  const deleteDoc = async (id) => {
-    if (!confirm("Supprimer ce document ?")) return;
-    await supabase.from("documents").delete().eq("id", id);
-    await loadAll(); showToast("Supprimé.");
-  };
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold" style={{ fontFamily: "Space Grotesk, sans-serif", color: C.ink }}>Devis & Factures</h1>
-        <Btn variant="primary" onClick={onNew}><Plus size={16} /> Nouveau</Btn>
-      </div>
-      <div className="flex gap-2 flex-wrap mb-5">
-        {statuts.map(s => (
-          <button key={s} onClick={() => setFilterStatut(s)} className="px-3 py-1.5 rounded-full text-xs font-semibold border transition" style={{ background: filterStatut === s ? C.ink : "#fff", color: filterStatut === s ? "#fff" : C.inkSoft, borderColor: filterStatut === s ? C.ink : C.line }}>{s}</button>
-        ))}
-      </div>
-      <Card>
-        {filtered.length === 0 && <div className="p-8 text-center text-sm" style={{ color: C.inkSoft }}>Aucun document. Créez votre premier devis !</div>}
-        {filtered.map((d, i) => (
-          <div key={d.id} className="flex items-center gap-3 px-5 py-4 border-b last:border-b-0 cursor-pointer hover:bg-gray-50 transition" style={{ borderColor: C.line }} onClick={() => onOpen(d.id)}>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className="font-semibold text-sm" style={{ color: C.ink }}>N°{d.numero}</span>
-                <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: C.panel, color: C.inkSoft }}>{d.type}</span>
-                <Badge statut={d.statut} />
-              </div>
-              <div className="text-xs" style={{ color: C.inkSoft }}>{getClient(d.client_id)?.nom || "—"} · {fmtDate(d.date_creation)}</div>
-            </div>
-            <div className="text-right shrink-0">
-              <div className="font-bold text-sm" style={{ fontFamily: "IBM Plex Mono, monospace", color: C.blueDeep }}>{euro(totalTTC(d.lignes))}</div>
-            </div>
-            <button onClick={e => { e.stopPropagation(); deleteDoc(d.id); }} className="p-1.5 rounded-lg hover:bg-red-50 transition" style={{ color: C.late }}><Trash2 size={15} /></button>
-          </div>
-        ))}
-      </Card>
-    </div>
-  );
-}
-
-// ---------- Formulaire document ----------
-function DocumentForm({ doc, clients, prestations, user, onBack, onSave }) {
-  const uid = () => Math.random().toString(36).slice(2, 9);
-  const [type, setType] = useState(doc?.type || "devis");
-  const [statut, setStatut] = useState(doc?.statut || "Brouillon");
-  const [clientId, setClientId] = useState(doc?.client_id || "");
-  const [dateCreation, setDateCreation] = useState(doc?.date_creation || todayISO());
-  const [dateEcheance, setDateEcheance] = useState(doc?.date_echeance || "");
-  const [lignes, setLignes] = useState(doc?.lignes?.length ? doc.lignes : [{ id: uid(), designation: "", qte: 1, pu: 0, tva: 20 }]);
-  const [saving, setSaving] = useState(false);
-  const [newClient, setNewClient] = useState({ nom: "", email: "", tel: "", adresse: "" });
-  const [showNewClient, setShowNewClient] = useState(false);
-
-  const numero = doc?.numero || `${new Date().getFullYear()}-${String(Math.floor(Math.random() * 900) + 100)}`;
-  const total = totalTTC(lignes);
-
-  const addLigne = () => setLignes(l => [...l, { id: uid(), designation: "", qte: 1, pu: 0, tva: 20 }]);
-  const removeLigne = (id) => setLignes(l => l.filter(x => x.id !== id));
-  const updateLigne = (id, key, val) => setLignes(l => l.map(x => x.id === id ? { ...x, [key]: val } : x));
-
-  const addClient = async () => {
-    if (!newClient.nom.trim()) return;
-    const { data } = await supabase.from("clients").insert({ ...newClient, user_id: user.id }).select().single();
-    if (data) { setClientId(data.id); setShowNewClient(false); setNewClient({ nom: "", email: "", tel: "", adresse: "" }); }
-  };
-
-  const save = async () => {
-    setSaving(true);
-    await onSave({ numero, type, statut, client_id: clientId || null, date_creation: dateCreation, date_echeance: dateEcheance || null, lignes });
-    setSaving(false);
-  };
-
-  return (
-    <div className="max-w-2xl">
-      <button onClick={onBack} className="flex items-center gap-2 text-sm mb-6 font-medium" style={{ color: C.inkSoft }}><ArrowLeft size={16} /> Retour</button>
-      <h1 className="text-2xl font-bold mb-6" style={{ fontFamily: "Space Grotesk, sans-serif", color: C.ink }}>{doc ? "Modifier" : "Nouveau document"} — N°{numero}</h1>
-
-      <Card className="p-5 mb-4">
-        <h2 className="font-semibold text-sm mb-4" style={{ color: C.ink }}>Informations</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Type">
-            <select className={inputCls} style={inputStyle} value={type} onChange={e => setType(e.target.value)}>
-              <option value="devis">Devis</option>
-              <option value="facture">Facture</option>
-            </select>
-          </Field>
-          <Field label="Statut">
-            <select className={inputCls} style={inputStyle} value={statut} onChange={e => setStatut(e.target.value)}>
-              {Object.keys(STATUS_STYLE).map(s => <option key={s}>{s}</option>)}
-            </select>
-          </Field>
-          <Field label="Date de création">
-            <input type="date" className={inputCls} style={inputStyle} value={dateCreation} onChange={e => setDateCreation(e.target.value)} />
-          </Field>
-          <Field label="Date d'échéance">
-            <input type="date" className={inputCls} style={inputStyle} value={dateEcheance} onChange={e => setDateEcheance(e.target.value)} />
-          </Field>
-        </div>
-        <Field label="Client">
-          <select className={inputCls} style={inputStyle} value={clientId} onChange={e => setClientId(e.target.value)}>
-            <option value="">— Sélectionner un client —</option>
-            {clients.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
-          </select>
-        </Field>
-        <button className="text-xs font-semibold mt-1" style={{ color: C.blue }} onClick={() => setShowNewClient(!showNewClient)}>+ Nouveau client</button>
-        {showNewClient && (
-          <div className="mt-3 p-4 rounded-xl border" style={{ borderColor: C.line }}>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Nom"><input className={inputCls} style={inputStyle} value={newClient.nom} onChange={e => setNewClient(n => ({ ...n, nom: e.target.value }))} /></Field>
-              <Field label="Email"><input className={inputCls} style={inputStyle} value={newClient.email} onChange={e => setNewClient(n => ({ ...n, email: e.target.value }))} /></Field>
-              <Field label="Téléphone"><input className={inputCls} style={inputStyle} value={newClient.tel} onChange={e => setNewClient(n => ({ ...n, tel: e.target.value }))} /></Field>
-              <Field label="Adresse"><input className={inputCls} style={inputStyle} value={newClient.adresse} onChange={e => setNewClient(n => ({ ...n, adresse: e.target.value }))} /></Field>
-            </div>
-            <Btn variant="dark" className="mt-2" onClick={addClient}>Créer le client</Btn>
-          </div>
-        )}
-      </Card>
-
-      <Card className="p-5 mb-4">
-        <h2 className="font-semibold text-sm mb-4" style={{ color: C.ink }}>Prestations</h2>
-        {lignes.map(l => (
-          <div key={l.id} className="grid grid-cols-12 gap-2 mb-3 items-end">
-            <div className="col-span-5"><Field label="Désignation"><input className={inputCls} style={inputStyle} value={l.designation} onChange={e => updateLigne(l.id, "designation", e.target.value)} placeholder="Prestation…" /></Field></div>
-            <div className="col-span-2"><Field label="Qté"><input type="number" className={inputCls} style={inputStyle} value={l.qte} onChange={e => updateLigne(l.id, "qte", e.target.value)} /></Field></div>
-            <div className="col-span-2"><Field label="PU HT"><input type="number" className={inputCls} style={inputStyle} value={l.pu} onChange={e => updateLigne(l.id, "pu", e.target.value)} /></Field></div>
-            <div className="col-span-2"><Field label="TVA %"><input type="number" className={inputCls} style={inputStyle} value={l.tva} onChange={e => updateLigne(l.id, "tva", e.target.value)} /></Field></div>
-            <div className="col-span-1 pb-4"><button onClick={() => removeLigne(l.id)} style={{ color: C.late }}><Trash2 size={16} /></button></div>
-          </div>
-        ))}
-        <Btn variant="ghost" onClick={addLigne}><Plus size={15} /> Ligne</Btn>
-        <div className="flex justify-between items-center mt-4 p-4 rounded-xl" style={{ background: C.panel2 }}>
-          <span className="font-semibold text-sm">Total TTC</span>
-          <span className="font-bold text-xl" style={{ fontFamily: "IBM Plex Mono, monospace", color: C.blueDeep }}>{euro(total)}</span>
-        </div>
-      </Card>
-
-      <div className="flex gap-3">
-        <Btn variant="dark" onClick={save} loading={saving}><CheckCircle2 size={16} /> Enregistrer</Btn>
-        <Btn variant="ghost" onClick={onBack}>Annuler</Btn>
-      </div>
-    </div>
-  );
-}
-
-// ---------- Relances ----------
-function RelancesView({ documents, clients, settings, setSettings }) {
-  const factures = documents.filter(d => d.type === "facture" && d.statut !== "Payé");
-  return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-6" style={{ fontFamily: "Space Grotesk, sans-serif", color: C.ink }}>Relances automatiques</h1>
-      <Card className="p-5 mb-4">
-        <div className="flex items-center justify-between mb-1">
-          <h2 className="font-semibold text-sm" style={{ color: C.ink }}>Activer les relances</h2>
-          <button onClick={() => setSettings(s => ({ ...s, actif: !s.actif }))} className="w-11 h-6 rounded-full relative transition" style={{ background: settings.actif ? C.green : C.line }}>
-            <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition" style={{ left: settings.actif ? 22 : 2 }} />
-          </button>
-        </div>
-        <p className="text-xs" style={{ color: C.inkSoft }}>L'Ardoise envoie un email automatique quand une facture dépasse son échéance.</p>
-      </Card>
-      <Card className="p-5 mb-4">
-        <h2 className="font-semibold text-sm mb-4" style={{ color: C.ink }}>Délais des relances</h2>
-        {[{ key: "j1", label: "1er rappel — ton courtois" }, { key: "j2", label: "2e rappel — ton ferme" }, { key: "j3", label: "Dernier rappel avant recouvrement" }].map(r => (
-          <div key={r.key} className="flex items-center justify-between py-2.5 border-b last:border-0" style={{ borderColor: C.line }}>
-            <span className="text-sm" style={{ color: C.ink }}>{r.label}</span>
-            <div className="flex items-center gap-2">
-              <span className="text-xs" style={{ color: C.inkSoft }}>J+</span>
-              <input type="number" className="w-16 px-2 py-1.5 rounded-lg text-sm text-center border" style={{ borderColor: C.line }} value={settings[r.key]} onChange={e => setSettings(s => ({ ...s, [r.key]: parseInt(e.target.value) || 0 }))} />
-            </div>
-          </div>
-        ))}
-      </Card>
-      <Card className="p-5">
-        <h2 className="font-semibold text-sm mb-3" style={{ color: C.ink }}>Factures suivies ({factures.length})</h2>
-        {factures.length === 0 && <p className="text-xs" style={{ color: C.inkSoft }}>Aucune facture en attente.</p>}
-        {factures.map(f => (
-          <div key={f.id} className="flex items-center justify-between py-2.5 border-b last:border-0 text-sm" style={{ borderColor: C.line }}>
-            <span>N°{f.numero} — {clients.find(c => c.id === f.client_id)?.nom || "—"}</span>
-            <Badge statut={f.statut} />
-          </div>
-        ))}
-      </Card>
-    </div>
-  );
-}
-
-// ---------- Réglages ----------
-function SettingsView({ entreprise, setEntreprise, showToast, onLogout }) {
-  const set = (k, v) => setEntreprise(e => ({ ...e, [k]: v }));
-  return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold mb-6" style={{ fontFamily: "Space Grotesk, sans-serif", color: C.ink }}>Réglages</h1>
-      <Card className="p-5 mb-4">
-        <h2 className="font-semibold text-sm mb-4" style={{ color: C.ink }}>Mon entreprise</h2>
-        <div className="grid sm:grid-cols-2 gap-x-4">
-          <Field label="Nom de l'entreprise"><input className={inputCls} style={inputStyle} value={entreprise.nom} onChange={e => set("nom", e.target.value)} /></Field>
-          <Field label="SIRET"><input className={inputCls} style={inputStyle} value={entreprise.siret} onChange={e => set("siret", e.target.value)} /></Field>
-          <Field label="Assurance décennale"><input className={inputCls} style={inputStyle} value={entreprise.assurance} onChange={e => set("assurance", e.target.value)} /></Field>
-          <Field label="N° RGE"><input className={inputCls} style={inputStyle} value={entreprise.rge} onChange={e => set("rge", e.target.value)} /></Field>
-        </div>
-        <Field label="IBAN"><input className={inputCls} style={inputStyle} value={entreprise.iban} onChange={e => set("iban", e.target.value)} /></Field>
-        <Btn variant="dark" onClick={() => showToast("Informations enregistrées !")}>Enregistrer</Btn>
-      </Card>
-      <Card className="p-5">
-        <h2 className="font-semibold text-sm mb-2" style={{ color: C.ink }}>Compte</h2>
-        <Btn variant="ghost" onClick={onLogout}><X size={15} /> Se déconnecter</Btn>
-      </Card>
+      {!isForm && <BottomNav view={view} setView={setView} />}
+      {(view === "dashboard" || view === "documents") && (
+        <FAB onClick={() => setView("newdoc")} />
+      )}
     </div>
   );
 }
