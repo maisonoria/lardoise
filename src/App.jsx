@@ -544,8 +544,10 @@ export default function App() {
         <DocumentForm doc={null} clients={clients} prestations={prestations} user={user}
           onBack={() => setView("documents")}
           onSave={async data => {
-            const { data: doc, error } = await supabase.from("documents").insert({ ...data, user_id: user.id }).select().single();
-if (error) { showToast("Erreur: " + error.message); return; }            if (data.lignes?.length) await supabase.from("lignes").insert(data.lignes.map(l => ({ ...l, document_id: doc.id })));
+            const { lignes: lignesData, ...docData } = data;
+            const { data: doc, error } = await supabase.from("documents").insert({ ...docData, user_id: user.id }).select().single();
+            if (error) { showToast("Erreur: " + error.message); return; }
+            if (lignesData?.length) await supabase.from("lignes").insert(lignesData.map(({ id, ...l }) => ({ ...l, document_id: doc.id })));
             await loadAll(); showToast("Devis créé ! ✓"); setView("documents");
           }}
         />
@@ -554,9 +556,10 @@ if (error) { showToast("Erreur: " + error.message); return; }            if (dat
         <DocumentForm doc={currentDoc} clients={clients} prestations={prestations} user={user}
           onBack={() => { setCurrentDocId(null); setView("documents"); }}
           onSave={async data => {
-            await supabase.from("documents").update({ ...data, lignes: undefined }).eq("id", currentDoc.id);
+            const { lignes: lignesData, ...docData } = data;
+            await supabase.from("documents").update(docData).eq("id", currentDoc.id);
             await supabase.from("lignes").delete().eq("document_id", currentDoc.id);
-            if (data.lignes?.length) await supabase.from("lignes").insert(data.lignes.map(l => ({ ...l, document_id: currentDoc.id })));
+            if (lignesData?.length) await supabase.from("lignes").insert(lignesData.map(({ id, ...l }) => ({ ...l, document_id: currentDoc.id })));
             await loadAll(); showToast("Enregistré ! ✓"); setCurrentDocId(null); setView("documents");
           }}
         />
